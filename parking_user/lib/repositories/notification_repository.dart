@@ -13,57 +13,44 @@ import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter_timezone/flutter_timezone.dart';
 
 const String iosCategoryIdentifier = 'test_notification';
-
-// final StreamController<NotificationResponse> selectNotificationStream =
-//     StreamController<NotificationResponse>.broadcast();
+const String actionId1 = 'id_1min';
+const String actionId2 = 'id_20min';
+const String actionId3 = 'id_notification';
+const String actionId4 = 'id_notification_text';
 
 // will be triggered when app is open in foreground
-Future<void> onDidReceiveNotificationResponse(
-    NotificationResponse notificationResponse) async {
-  print('onDidReceiveNotificationResponse');
-  if (notificationResponse.payload != null) {
-    print('Notification action payload: ${notificationResponse.payload}');
-  }
-  print('Selected: ${notificationResponse.actionId}');
-  // You can use the response's identifier to know which action was tapped
-  if (notificationResponse.actionId == 'id_1') {
-    print("Action 1 was selected");
-  } else if (notificationResponse.actionId == 'id_2') {
-    print("Action 2 was selected");
-  }
-
-  if (notificationResponse.payload != null) {
-    if (notificationResponse.actionId == 'id_1min') {
-      print("Action 1 was selected");
-      extendParkingTime(
-          1, notificationResponse.payload!, notificationResponse.id!);
-    } else if (notificationResponse.actionId == 'id_1hour') {
-      print("Action 2 was selected");
-      extendParkingTime(
-          60, notificationResponse.payload!, notificationResponse.id!);
-    } else if (notificationResponse.actionId == 'id_notification') {
-      print("Action 3 was selected");
-      updateExistingNotification(
-          notificationResponse.id!, notificationResponse.payload!);
-    } else if (notificationResponse.actionId == 'id_route') {
-      print("Action 4 was selected");
-    }
-  }
-}
+// Future<void> onDidReceiveNotificationResponse(
+//     NotificationResponse notificationResponse) async {
+//   if (notificationResponse.payload != null) {
+//     if (notificationResponse.actionId == actionId1) {
+//       extendParkingTime(
+//           1, notificationResponse.payload!, notificationResponse.id!);
+//     } else if (notificationResponse.actionId == actionId2) {
+//       extendParkingTime(
+//           20, notificationResponse.payload!, notificationResponse.id!);
+//     } else if (notificationResponse.actionId == actionId3) {
+//       updateExistingNotification(
+//           notificationResponse.id!, notificationResponse.payload!);
+//     }
+//   }
+// }
 
 // will be triggered when app is open in background
 @pragma('vm:entry-point')
 void notificationTapBackground(NotificationResponse notificationResponse) {
   if (notificationResponse.payload != null) {
-    if (notificationResponse.actionId == 'id_1min') {
+    if (notificationResponse.actionId == actionId1) {
       extendParkingTime(
           1, notificationResponse.payload!, notificationResponse.id!);
-    } else if (notificationResponse.actionId == 'id_1hour') {
+    } else if (notificationResponse.actionId == actionId2) {
       extendParkingTime(
-          60, notificationResponse.payload!, notificationResponse.id!);
-    } else if (notificationResponse.actionId == 'id_notification') {
+          20, notificationResponse.payload!, notificationResponse.id!);
+    } else if (notificationResponse.actionId == actionId3) {
       updateExistingNotification(
           notificationResponse.id!, notificationResponse.payload!);
+    } else if (notificationResponse.actionId == actionId4) {
+      updateExistingNotification(notificationResponse.id!,
+          notificationResponse.payload!, notificationResponse.input);
     }
   }
 }
@@ -97,8 +84,8 @@ Future<void> extendParkingTime(
       parkingId: parkingId);
 }
 
-Future<void> updateExistingNotification(
-    int notificationId, String parkingId) async {
+Future<void> updateExistingNotification(int notificationId, String parkingId,
+    [String? message]) async {
   await dotenv.load(fileName: "../.env");
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
@@ -109,13 +96,18 @@ Future<void> updateExistingNotification(
   if (parking == null) {
     return;
   }
+  if (parking.endTime!
+      .isBefore(DateTime.now().add(const Duration(seconds: 15)))) {
+    return;
+  }
   NotificationRepository notificationRepository =
       await NotificationRepository.initialize();
 
   await notificationRepository.scheduleNotification(
       id: notificationId,
       title: 'Parking expiration',
-      content: 'Parking at ${parking.parkinglot?.address.toString()}',
+      content:
+          message ?? 'Parking at ${parking.parkinglot?.address.toString()}',
       deliveryTime: parking.endTime!.subtract(const Duration(seconds: 15)),
       parkingId: parkingId);
 }
@@ -137,19 +129,24 @@ final List<DarwinNotificationCategory> darwinNotificationCategories =
   DarwinNotificationCategory(
     iosCategoryIdentifier,
     actions: <DarwinNotificationAction>[
-      DarwinNotificationAction.plain('id_1min', 'Extend time by 1 min from now',
+      DarwinNotificationAction.plain(actionId1, 'Extend time by 1 min from now',
           options: <DarwinNotificationActionOption>{
             DarwinNotificationActionOption.foreground,
           }),
       DarwinNotificationAction.plain(
-        'id_1hour',
-        'Extend time by 1 hour from now',
+        actionId2,
+        'Extend time by 20 min from now',
         options: <DarwinNotificationActionOption>{
           DarwinNotificationActionOption.foreground,
         },
       ),
-      DarwinNotificationAction.plain(
-          'id_notification', 'Set a new notification')
+      DarwinNotificationAction.plain(actionId3, 'Set a new notification'),
+      DarwinNotificationAction.text(
+        actionId4,
+        'Set notification with message',
+        buttonTitle: 'Send',
+        placeholder: 'Notification message',
+      ),
     ],
     options: <DarwinNotificationCategoryOption>{
       // Show the notification's subtitle, even if the user has disabled notification previews for the app.
@@ -176,7 +173,7 @@ Future<FlutterLocalNotificationsPlugin> initializeNotifications() async {
 
   await flutterLocalNotificationsPlugin.initialize(
     initializationSettings,
-    onDidReceiveNotificationResponse: onDidReceiveNotificationResponse,
+    onDidReceiveNotificationResponse: notificationTapBackground,
     onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
   );
   return flutterLocalNotificationsPlugin;

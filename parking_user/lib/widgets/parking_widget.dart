@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:parking_user/blocs/notification/notification_bloc.dart';
+import 'package:parking_user/utils/utils.dart';
 import 'package:parking_user/widgets/time_spinner_widget.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_client/shared_client.dart';
@@ -55,6 +56,42 @@ class _ParkingWidgetState extends State<ParkingWidget> {
     }
   }
 
+  void setParkingStopTime() async {
+    DateTime? picked = await showEndTimePicker(context);
+
+    if (picked != null && picked != widget.item.endTime && context.mounted) {
+      widget.item.endTime = DateTime.now().add(Duration(
+        hours: picked.hour,
+        minutes: picked.minute,
+        seconds: picked.second,
+      ));
+      context.read<ParkingBloc>().add(EditParkingEvent(parking: widget.item));
+      // If there is a notification scheduled for this parking, cancel it
+      context
+          .read<NotificationBloc>()
+          .add(CancelNotification(id: widget.item.id));
+    }
+  }
+
+  void setNotification() async {
+    DateTime? picked = await showEndTimePicker(context);
+
+    if (picked != null && picked != widget.item.endTime && context.mounted) {
+      Duration diff = Duration(
+          hours: picked.hour, minutes: picked.minute, seconds: picked.second);
+
+      if (widget.item.endTime!.isAfter(DateTime.now().add(diff))) {
+        context.read<NotificationBloc>().add(ScheduleNotification(
+            id: widget.item.id,
+            title: "Parking expiration",
+            content: 'Parking at ${widget.item.parkinglot?.address.toString()}',
+            deliveryTime: widget.item.endTime!.subtract(diff)));
+      } else {
+        Utils.toastMessage('Too late to schedule notification');
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     NotificationState notificationState =
@@ -83,37 +120,21 @@ class _ParkingWidgetState extends State<ParkingWidget> {
                     bool is_scheduled =
                         notificationState.isIdScheduled(widget.item.id);
 
-                    Map<String, int> scheduledIds =
-                        context.read<NotificationBloc>().state.scheduledIds;
-                    print('object: $scheduledIds');
                     return Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: <Widget>[
                         TextButton(
                           child: const Text('Set stop time'),
                           onPressed: () async {
-                            DateTime? picked = await showEndTimePicker(context);
-
-                            if (picked != null &&
-                                picked != widget.item.endTime &&
-                                context.mounted) {
-                              widget.item.endTime = DateTime.now().add(Duration(
-                                hours: picked.hour,
-                                minutes: picked.minute,
-                                seconds: picked.second,
-                              ));
-                              context
-                                  .read<ParkingBloc>()
-                                  .add(EditParkingEvent(parking: widget.item));
-                            }
+                            setParkingStopTime();
                           },
                         ),
                         widget.item.endTime != null
                             ? IconButton(
                                 icon: is_scheduled
-                                    ? const FaIcon(FontAwesomeIcons.bellSlash)
-                                    : FaIcon(FontAwesomeIcons.bell),
-                                onPressed: () => {
+                                    ? const FaIcon(FontAwesomeIcons.bell)
+                                    : FaIcon(FontAwesomeIcons.bellSlash),
+                                onPressed: () async => {
                                       if (is_scheduled)
                                         {
                                           context.read<NotificationBloc>().add(
@@ -121,18 +142,7 @@ class _ParkingWidgetState extends State<ParkingWidget> {
                                                   id: widget.item.id))
                                         }
                                       else
-                                        {
-                                          context.read<NotificationBloc>().add(
-                                              ScheduleNotification(
-                                                  id: widget.item.id,
-                                                  title: "Parking expiration",
-                                                  content:
-                                                      'Parking at ${widget.item.parkinglot?.address.toString()}',
-                                                  deliveryTime: widget
-                                                      .item.endTime!
-                                                      .subtract(const Duration(
-                                                          seconds: 30)))),
-                                        }
+                                        {setNotification()}
                                     })
                             : const SizedBox.shrink(),
                       ],
