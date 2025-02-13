@@ -22,3 +22,9 @@ class CancelNotification extends NotificationEvent {
     required this.id,
   });
 }
+
+class UpdateNotificationEvent extends NotificationEvent {
+  final DateTime newTime;
+
+  UpdateNotificationEvent(this.newTime);
+}

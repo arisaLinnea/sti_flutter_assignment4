@@ -27,7 +27,6 @@ class _ParkingLotViewState extends State<EditParkingLotView> {
     super.initState();
     parkingLot =
         context.read<ParkingLotBloc>().getParkingLotById(id: widget.lotId);
-    print('ParkingLot: $parkingLot');
   }
 
   @override

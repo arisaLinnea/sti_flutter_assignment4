@@ -17,7 +17,9 @@ class NotificationBloc
       if (event is ScheduleNotification) {
         await _handleScheduleToState(event, emit);
       } else if (event is CancelNotification) {
-        await _handleCancelState(emit);
+        await _handleCancelState(event, emit);
+      } else if (event is UpdateNotificationEvent) {
+        await _handleUpdateState(event, emit);
       }
     });
   }
@@ -30,18 +32,31 @@ class NotificationBloc
         id: notificationId,
         title: event.title,
         content: event.content,
-        deliveryTime: event.deliveryTime);
+        deliveryTime: event.deliveryTime,
+        parkingId: event.id);
 
-    // final newState = Map<String, int>.from(state.scheduledIds);
-    // newState[id] = notificationId;
-    // emit(NotificationState(scheduledIds: newState));
-    emit(NotificationState(
-        scheduledIds: {...state.scheduledIds, "id": notificationId}));
+    final newState = Map<String, int>.from(state.scheduledIds);
+    newState[event.id] = notificationId;
+    emit(NotificationState(scheduledIds: newState));
   }
 
-  Future<void> _handleCancelState(Emitter<NotificationState> emit) async {
-    // await notRepository.cancelNotification();
-    emit(NotificationState(scheduledIds: {}));
+  Future<void> _handleCancelState(
+      CancelNotification event, Emitter<NotificationState> emit) async {
+    String id = event.id;
+    final notificationId = state.scheduledIds[id];
+    if (notificationId != null) {
+      await notRepository.cancelScheduledNotificaion(notificationId);
+      final newState = Map<String, int>.from(state.scheduledIds);
+      newState.remove(id);
+      emit(NotificationState(scheduledIds: newState));
+    }
+  }
+
+  Future<void> _handleUpdateState(
+      UpdateNotificationEvent event, Emitter<NotificationState> emit) async {
+    // final newState = Map<String, int>.from(state.scheduledIds);
+    // newState.update(event.newTime.toString(), (value) => value);
+    // emit(NotificationState(scheduledIds: newState));
   }
 
   @override

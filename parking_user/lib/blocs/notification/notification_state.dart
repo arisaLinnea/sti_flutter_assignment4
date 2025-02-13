@@ -5,7 +5,9 @@ class NotificationState extends Equatable {
 
   const NotificationState({required this.scheduledIds});
 
-  bool isIdScheduled(String id) => scheduledIds.containsKey(id);
+  bool isIdScheduled(String id) {
+    return scheduledIds.containsKey(id);
+  }
 
   @override
   List<Object?> get props => [scheduledIds];
